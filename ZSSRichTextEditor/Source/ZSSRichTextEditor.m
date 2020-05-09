@@ -18,9 +18,9 @@
 
 
 /**
- 
+
  WKWebView modifications for hiding the inputAccessoryView
- 
+
  **/
 @interface WKWebView (HackishAccessoryHiding)
 @property (nonatomic, assign) BOOL hidesInputAccessoryView;
@@ -33,7 +33,7 @@ static Class hackishFixClass = Nil;
 
 - (UIView *)hackishlyFoundBrowserView {
     UIScrollView *scrollView = self.scrollView;
-    
+
     UIView *browserView = nil;
     for (UIView *subview in scrollView.subviews) {
         if ([NSStringFromClass([subview class]) hasPrefix:@"WKWebBrowserView"]) {
@@ -55,7 +55,7 @@ static Class hackishFixClass = Nil;
         IMP nilImp = [self methodForSelector:@selector(methodReturningNil)];
         class_addMethod(newClass, @selector(inputAccessoryView), nilImp, "@@:");
         objc_registerClassPair(newClass);
-        
+
         hackishFixClass = newClass;
     }
 }
@@ -71,7 +71,7 @@ static Class hackishFixClass = Nil;
         return;
     }
     [self ensureHackishSubclassExistsOfBrowserViewClass:[browserView class]];
-    
+
     if (value) {
         object_setClass(browserView, hackishFixClass);
     }
@@ -233,9 +233,9 @@ static Class hackishFixClass = Nil;
 @end
 
 /*
- 
+
  ZSSRichTextEditor
- 
+
  */
 @implementation ZSSRichTextEditor
 
@@ -245,104 +245,104 @@ static CGFloat kDefaultScale = 0.5;
 
 #pragma mark - View Did Load Section
 - (void)viewDidLoad {
-    
+
     [super viewDidLoad];
-    
+
     //Initialise variables
     self.editorLoaded = NO;
     self.receiveEditorDidChangeEvents = NO;
     self.alwaysShowToolbar = NO;
     self.shouldShowKeyboard = YES;
     self.formatHTML = YES;
-    
+
     //Initalise enabled toolbar items array
     self.enabledToolbarItems = [[NSArray alloc] init];
-    
+
     //Frame for the source view and editor view
     CGRect frame = CGRectMake(0, 0, self.view.frame.size.width, self.view.frame.size.height);
-    
+
     //Source View
     [self createSourceViewWithFrame:frame];
-    
+
     //Editor View
     [self createEditorViewWithFrame:frame];
-    
+
     //Image Picker used to allow the user insert images from the device (base64 encoded)
     [self setUpImagePicker];
-    
+
     //Scrolling View
     [self createToolBarScroll];
-    
+
     //Toolbar with icons
     [self createToolbar];
-    
+
     //Parent holding view
     [self createParentHoldingView];
-    
+
     //Hide Keyboard
     if (![self isIpad]) {
         NSBundle* bundle = [NSBundle bundleForClass:[ZSSRichTextEditor class]];
-        
+
         // Toolbar holder used to crop and position toolbar
         UIView *toolbarCropper = [[UIView alloc] initWithFrame:CGRectMake(self.view.frame.size.width-44, 0, 44, 44)];
         toolbarCropper.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin;
         toolbarCropper.clipsToBounds = YES;
-        
+
         UIButton *btn = [[UIButton alloc] initWithFrame:CGRectMake(0, 0, 44, 44)];
-        
+
         [btn addTarget:self action:@selector(dismissKeyboard) forControlEvents:UIControlEventTouchUpInside];
         UIImage *image = [[UIImage imageNamed:@"ZSSkeyboard.png" inBundle:bundle compatibleWithTraitCollection:nil] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
         [btn setImage:image forState:UIControlStateNormal];
         [btn setTintColor:[self barButtonItemDefaultColor]];
-        
+
         [toolbarCropper addSubview:btn];
-        
+
         [self.toolbarHolder addSubview:toolbarCropper];
-        
+
         UIView *line = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 0.6f, 44)];
         line.backgroundColor = [UIColor lightGrayColor];
         line.alpha = 0.7f;
         [toolbarCropper addSubview:line];
-        
+
     }
-    
+
     [self.view addSubview:self.toolbarHolder];
-    
+
     //Build the toolbar
     [self buildToolbar];
-    
+
     //Load Resources
     if (!self.resourcesLoaded) {
-        
+
         [self loadResources];
-        
+
     }
-    
+
 }
 
 #pragma mark - View Will Appear Section
 - (void)viewWillAppear:(BOOL)animated {
-    
+
     [super viewWillAppear:animated];
-    
+
     //Add observers for keyboard showing or hiding notifications
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyboardWillShowOrHide:) name:UIKeyboardWillChangeFrameNotification object:nil];
 }
 
 #pragma mark - View Will Disappear Section
 - (void)viewWillDisappear:(BOOL)animated {
-    
+
     [super viewWillDisappear:animated];
-    
+
     //Remove observers for keyboard showing or hiding notifications
     [[NSNotificationCenter defaultCenter] removeObserver:self name:UIKeyboardWillChangeFrameNotification object:nil];
-    
+
 }
 
 #pragma mark - Set Up View Section
 
 - (void)createSourceViewWithFrame:(CGRect)frame {
-    
+
     self.sourceView = [[ZSSTextView alloc] initWithFrame:frame];
     self.sourceView.hidden = YES;
     self.sourceView.autocapitalizationType = UITextAutocapitalizationTypeNone;
@@ -352,41 +352,41 @@ static CGFloat kDefaultScale = 0.5;
     self.sourceView.autoresizesSubviews = YES;
     self.sourceView.delegate = self;
     [self.view addSubview:self.sourceView];
-    
+
 }
 
 - (void)createEditorViewWithFrame:(CGRect)frame {
-    
-    
+
+
     //allocate config and contentController and add scriptMessageHandler
     WKWebViewConfiguration *config = [[WKWebViewConfiguration alloc] init];
 
     WKUserContentController *contentController = [[WKUserContentController alloc] init];
     [contentController addScriptMessageHandler:self name:@"jsm"];
-    
+
     config.userContentController = contentController;
 
     //load scripts
     NSString *scriptString = @"var meta = document.createElement('meta'); meta.setAttribute('name', 'viewport'); meta.setAttribute('content', 'width=device-width'); document.getElementsByTagName('head')[0].appendChild(meta);";
 
     WKUserScript *script = [[WKUserScript alloc] initWithSource:scriptString injectionTime:WKUserScriptInjectionTimeAtDocumentEnd forMainFrameOnly:YES];
-    
+
     [contentController addUserScript:script];
-    
-    
+
+
     //set data detection to none so it doesnt conflict
     config.dataDetectorTypes = WKDataDetectorTypeNone;
-    
 
-    
+
+
     self.editorView = [[WKWebView alloc] initWithFrame:frame
                                          configuration: config];
 
-    
+
     self.editorView.UIDelegate = self;
     self.editorView.navigationDelegate = self;
     self.editorView.hidesInputAccessoryView = YES;
-    
+
     //TODO: Is this behavior correct? Is it the right replacement?
 //    self.editorView.keyboardDisplayRequiresUserAction = NO;
     [ZSSRichTextEditor allowDisplayingKeyboardWithoutUserAction];
@@ -395,56 +395,56 @@ static CGFloat kDefaultScale = 0.5;
     self.editorView.scrollView.bounces = YES;
     self.editorView.backgroundColor = [UIColor whiteColor];
     [self.view addSubview:self.editorView];
-    
+
 }
 
 - (void)setUpImagePicker {
-    
+
     self.imagePicker = [[UIImagePickerController alloc] init];
     self.imagePicker.delegate = self;
     self.imagePicker.sourceType = UIImagePickerControllerSourceTypePhotoLibrary;
     self.imagePicker.allowsEditing = YES;
     self.selectedImageScale = kDefaultScale; //by default scale to half the size
-    
+
 }
 
 - (void)createToolBarScroll {
-    
+
     self.toolBarScroll = [[UIScrollView alloc] initWithFrame:CGRectMake(0, 0, [self isIpad] ? self.view.frame.size.width : self.view.frame.size.width - 44, 44)];
     self.toolBarScroll.backgroundColor = [UIColor clearColor];
     self.toolBarScroll.showsHorizontalScrollIndicator = NO;
-    
+
 }
 
 - (void)createToolbar {
-    
+
     self.toolbar = [[UIToolbar alloc] initWithFrame:CGRectZero];
     self.toolbar.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     self.toolbar.backgroundColor = [UIColor clearColor];
     [self.toolBarScroll addSubview:self.toolbar];
     self.toolBarScroll.autoresizingMask = self.toolbar.autoresizingMask;
-    
+
 }
 
 - (void)createParentHoldingView {
-    
+
     //Background Toolbar
     UIToolbar *backgroundToolbar = [[UIToolbar alloc] initWithFrame:CGRectMake(0, 0, self.view.frame.size.width, 44)];
     backgroundToolbar.autoresizingMask = UIViewAutoresizingFlexibleWidth;
-    
+
     //Parent holding view
     self.toolbarHolder = [[UIView alloc] init];
-    
+
     if (_alwaysShowToolbar) {
         self.toolbarHolder.frame = CGRectMake(0, self.view.frame.size.height - 44, self.view.frame.size.width, 44);
     } else {
         self.toolbarHolder.frame = CGRectMake(0, self.view.frame.size.height, self.view.frame.size.width, 44);
     }
-    
+
     self.toolbarHolder.autoresizingMask = self.toolbar.autoresizingMask;
     [self.toolbarHolder addSubview:self.toolBarScroll];
     [self.toolbarHolder insertSubview:backgroundToolbar atIndex:0];
-    
+
 }
 
 #pragma mark - Convenience replacement for keyboardDisplayRequiresUserAction in WKWebview
@@ -494,77 +494,77 @@ static CGFloat kDefaultScale = 0.5;
 #pragma mark - Resources Section
 
 - (void)loadResources {
-    
+
     //Define correct bundle for loading resources
     NSBundle* bundle = [NSBundle bundleForClass:[ZSSRichTextEditor class]];
-    
+
     //Create a string with the contents of editor.html
     NSString *filePath = [bundle pathForResource:@"editor" ofType:@"html"];
     NSData *htmlData = [NSData dataWithContentsOfFile:filePath];
     NSString *htmlString = [[NSString alloc] initWithData:htmlData encoding:NSUTF8StringEncoding];
-    
+
     //Add jQuery.js to the html file
     NSString *jquery = [bundle pathForResource:@"jQuery" ofType:@"js"];
     NSString *jqueryString = [[NSString alloc] initWithData:[NSData dataWithContentsOfFile:jquery] encoding:NSUTF8StringEncoding];
     htmlString = [htmlString stringByReplacingOccurrencesOfString:@"<!-- jQuery -->" withString:jqueryString];
-    
+
     //Add JSBeautifier.js to the html file
     NSString *beautifier = [bundle pathForResource:@"JSBeautifier" ofType:@"js"];
     NSString *beautifierString = [[NSString alloc] initWithData:[NSData dataWithContentsOfFile:beautifier] encoding:NSUTF8StringEncoding];
     htmlString = [htmlString stringByReplacingOccurrencesOfString:@"<!-- jsbeautifier -->" withString:beautifierString];
-    
+
     //Add ZSSRichTextEditor.js to the html file
     NSString *source = [bundle pathForResource:@"ZSSRichTextEditor" ofType:@"js"];
     NSString *jsString = [[NSString alloc] initWithData:[NSData dataWithContentsOfFile:source] encoding:NSUTF8StringEncoding];
     htmlString = [htmlString stringByReplacingOccurrencesOfString:@"<!--editor-->" withString:jsString];
-    
+
     [self.editorView loadHTMLString:htmlString baseURL:self.baseURL];
     self.resourcesLoaded = YES;
-    
+
 }
 
 #pragma mark - Toolbar Section
 
 - (void)setEnabledToolbarItems:(NSArray *)enabledToolbarItems {
-    
+
     _enabledToolbarItems = enabledToolbarItems;
     [self buildToolbar];
-    
+
 }
 
 
 - (void)setToolbarItemTintColor:(UIColor *)toolbarItemTintColor {
-    
+
     _toolbarItemTintColor = toolbarItemTintColor;
-    
+
     // Update the color
     for (ZSSBarButtonItem *item in self.toolbar.items) {
         item.tintColor = [self barButtonItemDefaultColor];
     }
     self.keyboardItem.tintColor = toolbarItemTintColor;
-    
+
 }
 
 
 - (void)setToolbarItemSelectedTintColor:(UIColor *)toolbarItemSelectedTintColor {
-    
+
     _toolbarItemSelectedTintColor = toolbarItemSelectedTintColor;
-    
+
 }
 
 - (NSArray *)itemsForToolbar {
-    
+
     //Define correct bundle for loading resources
     NSBundle* bundle = [NSBundle bundleForClass:[ZSSRichTextEditor class]];
-    
+
     NSMutableArray *items = [[NSMutableArray alloc] init];
-    
+
     // None
     if(_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarNone])
     {
         return items;
     }
-    
+
     BOOL customOrder = NO;
     if (_enabledToolbarItems && ![_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll]){
         customOrder = YES;
@@ -572,7 +572,7 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:@""];
         }
     }
-    
+
     // Bold
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarBold]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
         ZSSBarButtonItem *bold = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSSbold.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(setBold)];
@@ -583,7 +583,7 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:bold];
         }
     }
-    
+
     // Italic
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarItalic]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
         ZSSBarButtonItem *italic = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSSitalic.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(setItalic)];
@@ -594,7 +594,7 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:italic];
         }
     }
-    
+
     // Subscript
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarSubscript]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
         ZSSBarButtonItem *subscript = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSSsubscript.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(setSubscript)];
@@ -605,7 +605,7 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:subscript];
         }
     }
-    
+
     // Superscript
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarSuperscript]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
         ZSSBarButtonItem *superscript = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSSsuperscript.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(setSuperscript)];
@@ -616,7 +616,7 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:superscript];
         }
     }
-    
+
     // Strike Through
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarStrikeThrough]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
         ZSSBarButtonItem *strikeThrough = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSSstrikethrough.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(setStrikethrough)];
@@ -627,7 +627,7 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:strikeThrough];
         }
     }
-    
+
     // Underline
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarUnderline]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
         ZSSBarButtonItem *underline = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSSunderline.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(setUnderline)];
@@ -638,7 +638,7 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:underline];
         }
     }
-    
+
     // Remove Format
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarRemoveFormat]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
         ZSSBarButtonItem *removeFormat = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSSclearstyle.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(removeFormat)];
@@ -649,10 +649,10 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:removeFormat];
         }
     }
-    
+
     //  Fonts
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarFonts]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
-        
+
         ZSSBarButtonItem *fonts = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSSfonts.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(showFontsPicker)];
         fonts.label = @"fonts";
         if (customOrder) {
@@ -660,9 +660,9 @@ static CGFloat kDefaultScale = 0.5;
         } else {
             [items addObject:fonts];
         }
-        
+
     }
-    
+
     // Undo
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarUndo]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
         ZSSBarButtonItem *undoButton = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSSundo.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(undo:)];
@@ -673,7 +673,7 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:undoButton];
         }
     }
-    
+
     // Redo
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarRedo]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
         ZSSBarButtonItem *redoButton = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSSredo.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(redo:)];
@@ -684,7 +684,7 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:redoButton];
         }
     }
-    
+
     // Align Left
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarJustifyLeft]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
         ZSSBarButtonItem *alignLeft = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSSleftjustify.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(alignLeft)];
@@ -695,7 +695,7 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:alignLeft];
         }
     }
-    
+
     // Align Center
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarJustifyCenter]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
         ZSSBarButtonItem *alignCenter = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSScenterjustify.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(alignCenter)];
@@ -706,7 +706,7 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:alignCenter];
         }
     }
-    
+
     // Align Right
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarJustifyRight]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
         ZSSBarButtonItem *alignRight = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSSrightjustify.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(alignRight)];
@@ -717,7 +717,7 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:alignRight];
         }
     }
-    
+
     // Align Justify
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarJustifyFull]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
         ZSSBarButtonItem *alignFull = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSSforcejustify.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(alignFull)];
@@ -728,7 +728,7 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:alignFull];
         }
     }
-    
+
     // Paragraph
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarParagraph]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
         ZSSBarButtonItem *paragraph = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSSparagraph.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(paragraph)];
@@ -739,7 +739,7 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:paragraph];
         }
     }
-    
+
     // Header 1
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarH1]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
         ZSSBarButtonItem *h1 = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSSh1.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(heading1)];
@@ -750,7 +750,7 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:h1];
         }
     }
-    
+
     // Header 2
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarH2]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
         ZSSBarButtonItem *h2 = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSSh2.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(heading2)];
@@ -761,7 +761,7 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:h2];
         }
     }
-    
+
     // Header 3
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarH3]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
         ZSSBarButtonItem *h3 = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSSh3.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(heading3)];
@@ -772,7 +772,7 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:h3];
         }
     }
-    
+
     // Heading 4
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarH4]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
         ZSSBarButtonItem *h4 = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSSh4.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(heading4)];
@@ -783,7 +783,7 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:h4];
         }
     }
-    
+
     // Header 5
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarH5]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
         ZSSBarButtonItem *h5 = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSSh5.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(heading5)];
@@ -794,7 +794,7 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:h5];
         }
     }
-    
+
     // Heading 6
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarH6]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
         ZSSBarButtonItem *h6 = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSSh6.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(heading6)];
@@ -805,7 +805,7 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:h6];
         }
     }
-    
+
     // Text Color
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarTextColor]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
         ZSSBarButtonItem *textColor = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSStextcolor.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(textColor)];
@@ -816,7 +816,7 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:textColor];
         }
     }
-    
+
     // Background Color
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarBackgroundColor]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
         ZSSBarButtonItem *bgColor = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSSbgcolor.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(bgColor)];
@@ -827,7 +827,7 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:bgColor];
         }
     }
-    
+
     // Unordered List
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarUnorderedList]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
         ZSSBarButtonItem *ul = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSSunorderedlist.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(setUnorderedList)];
@@ -838,7 +838,7 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:ul];
         }
     }
-    
+
     // Ordered List
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarOrderedList]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
         ZSSBarButtonItem *ol = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSSorderedlist.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(setOrderedList)];
@@ -849,7 +849,7 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:ol];
         }
     }
-    
+
     // Horizontal Rule
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarHorizontalRule]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
         ZSSBarButtonItem *hr = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSShorizontalrule.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(setHR)];
@@ -860,7 +860,7 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:hr];
         }
     }
-    
+
     // Indent
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarIndent]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
         ZSSBarButtonItem *indent = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSSindent.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(setIndent)];
@@ -871,7 +871,7 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:indent];
         }
     }
-    
+
     // Outdent
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarOutdent]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
         ZSSBarButtonItem *outdent = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSSoutdent.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(setOutdent)];
@@ -882,7 +882,7 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:outdent];
         }
     }
-    
+
     // Image
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarInsertImage]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
         ZSSBarButtonItem *insertImage = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSSimage.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(insertImage)];
@@ -893,7 +893,7 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:insertImage];
         }
     }
-    
+
     // Image From Device
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarInsertImageFromDevice]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
         ZSSBarButtonItem *insertImageFromDevice = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSSimageDevice.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(insertImageFromDevice)];
@@ -904,7 +904,7 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:insertImageFromDevice];
         }
     }
-    
+
     // Insert Link
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarInsertLink]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
         ZSSBarButtonItem *insertLink = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSSlink.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(insertLink)];
@@ -915,7 +915,7 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:insertLink];
         }
     }
-    
+
     // Remove Link
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarRemoveLink]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
         ZSSBarButtonItem *removeLink = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSSunlink.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(removeLink)];
@@ -926,7 +926,7 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:removeLink];
         }
     }
-    
+
     // Quick Link
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarQuickLink]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
         ZSSBarButtonItem *quickLink = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSSquicklink.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(quickLink)];
@@ -937,7 +937,7 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:quickLink];
         }
     }
-    
+
     // Show Source
     if ((_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarViewSource]) || (_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarAll])) {
         ZSSBarButtonItem *showSource = [[ZSSBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ZSSviewsource.png" inBundle:bundle compatibleWithTraitCollection:nil] style:UIBarButtonItemStylePlain target:self action:@selector(showHTMLSource:)];
@@ -948,28 +948,28 @@ static CGFloat kDefaultScale = 0.5;
             [items addObject:showSource];
         }
     }
-    
+
     return [NSArray arrayWithArray:items];
-    
+
 }
 
 
 - (void)buildToolbar {
-    
+
     // Check to see if we have any toolbar items, if not, add them all
     NSArray *items = [self itemsForToolbar];
     if (items.count == 0 && !(_enabledToolbarItems && [_enabledToolbarItems containsObject:ZSSRichTextEditorToolbarNone])) {
         _enabledToolbarItems = @[ZSSRichTextEditorToolbarAll];
         items = [self itemsForToolbar];
     }
-    
+
     if (self.customZSSBarButtonItems != nil) {
         items = [items arrayByAddingObjectsFromArray:self.customZSSBarButtonItems];
     }
-    
+
     // get the width before we add custom buttons
     CGFloat toolbarWidth = items.count == 0 ? 0.0f : (CGFloat)(items.count * 44);
-    
+
     if(self.customBarButtonItems != nil)
     {
         items = [items arrayByAddingObjectsFromArray:self.customBarButtonItems];
@@ -978,12 +978,12 @@ static CGFloat kDefaultScale = 0.5;
             toolbarWidth += buttonItem.customView.frame.size.width + 11.0f;
         }
     }
-    
+
     self.toolbar.items = items;
     for (ZSSBarButtonItem *item in items) {
         item.tintColor = [self barButtonItemDefaultColor];
     }
-    
+
     self.toolbar.frame = CGRectMake(0, 0, toolbarWidth, 44);
     self.toolBarScroll.contentSize = CGSizeMake(self.toolbar.frame.size.width, 44);
 }
@@ -992,76 +992,76 @@ static CGFloat kDefaultScale = 0.5;
 #pragma mark - Editor Modification Section
 
 - (void)setCSS:(NSString *)css {
-    
+
     self.customCSS = css;
-    
+
     if (self.editorLoaded) {
         [self updateCSS];
     }
-    
+
 }
 
 - (void)updateCSS {
-    
+
     if (self.customCSS != NULL && [self.customCSS length] != 0) {
-        
+
         NSString *js = [NSString stringWithFormat:@"zss_editor.setCustomCSS(\"%@\");", self.customCSS];
         [self.editorView evaluateJavaScript:js completionHandler:^(NSString *result, NSError *error) {
-         
+
         }];
-        
+
     }
-    
+
 }
 
 - (void)setPlaceholderText {
-    
+
     //Call the setPlaceholder javascript method if a placeholder has been set
     if (self.placeholder != NULL && [self.placeholder length] != 0) {
-        
+
         NSString *js = [NSString stringWithFormat:@"zss_editor.setPlaceholder(\"%@\");", self.placeholder];
         [self.editorView evaluateJavaScript:js completionHandler:^(NSString *result, NSError *error) {
-         
+
         }];
 
-        
+
     }
-    
+
 }
 
 - (void)setFooterHeight:(float)footerHeight {
-    
+
     //Call the setFooterHeight javascript method
     NSString *js = [NSString stringWithFormat:@"zss_editor.setFooterHeight(\"%f\");", footerHeight];
     [self.editorView evaluateJavaScript:js completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 
-    
+
 }
 
 - (void)setContentHeight:(float)contentHeight {
-    
+
     //Call the contentHeight javascript method
     NSString *js = [NSString stringWithFormat:@"zss_editor.contentHeight = %f;", contentHeight];
     [self.editorView evaluateJavaScript:js completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 
-    
+
 }
 
 #pragma mark - Editor Interaction
 
 - (void)focusTextEditor {
-    
+
     //TODO: Is this behavior correct? Is it the right replacement?
 //    self.editorView.keyboardDisplayRequiresUserAction = NO;
     [ZSSRichTextEditor allowDisplayingKeyboardWithoutUserAction];
-    
+
     NSString *js = [NSString stringWithFormat:@"zss_editor.focusEditor();"];
     [self.editorView evaluateJavaScript:js completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 
 }
@@ -1069,51 +1069,64 @@ static CGFloat kDefaultScale = 0.5;
 - (void)blurTextEditor {
     NSString *js = [NSString stringWithFormat:@"zss_editor.blurEditor();"];
     [self.editorView evaluateJavaScript:js completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 
 }
 
 - (void)setHTML:(NSString *)html {
-    
+
     self.internalHTML = html;
-    
+
     if (self.editorLoaded) {
         [self updateHTML];
     }
-    
+
 }
 
 - (void)updateHTML {
-    
+
     NSString *html = self.internalHTML;
     self.sourceView.text = html;
-    NSString *cleanedHTML = [self removeQuotesFromHTML:self.sourceView.text];
+    NSString *cleanedHTML = [self addSlashes:self.sourceView.text];
     NSString *trigger = [NSString stringWithFormat:@"zss_editor.setHTML(\"%@\");", cleanedHTML];
     [self.editorView evaluateJavaScript:trigger completionHandler:^(NSString *result, NSError *error) {
 
     }];
 
-    
+
+}
+
+- (NSString *)addSlashes:(NSString *)html {
+  html = [html stringByReplacingOccurrencesOfString:@"\\" withString:@"\\\\"];
+  html = [html stringByReplacingOccurrencesOfString:@"\"" withString:@"\\\""];
+  html = [html stringByReplacingOccurrencesOfString:@"\r" withString:@"\\r"];
+  html = [html stringByReplacingOccurrencesOfString:@"\n" withString:@"\\n"];
+
+  // invisible line separator and paragraph separator characters
+  html = [html stringByReplacingOccurrencesOfString:@"\u2028" withString:@"\\u2028"];
+  html = [html stringByReplacingOccurrencesOfString:@"\u2029" withString:@"\\u2029"];
+
+  return html;
 }
 
 - (void)getHTML:(void (^ _Nullable)(_Nullable id, NSError * _Nullable error))completionHandler {
-    
-    
+
+
     [self.editorView evaluateJavaScript:ZSSEditorHTML completionHandler:^(NSString *result, NSError *error) {
-        
+
         if (error != NULL) {
             NSLog(@"HTML Parsing Error: %@", error);
         }
-        
+
         NSLog(@"%@", result);
-     
+
         NSString *html = [self removeQuotesFromHTML:result];
-        
+
         NSLog(@"%@", html);
-        
+
         [self tidyHTML:html completionHandler:^(NSString *result, NSError *error) {
-            completionHandler(result, error);
+            completionHandler(html, error);
         }];
 
     }];
@@ -1121,24 +1134,24 @@ static CGFloat kDefaultScale = 0.5;
 
 
 - (void)insertHTML:(NSString *)html {
-    
+
     NSString *cleanedHTML = [self removeQuotesFromHTML:html];
     NSString *trigger = [NSString stringWithFormat:@"zss_editor.insertHTML(\"%@\");", cleanedHTML];
     [self.editorView evaluateJavaScript:trigger completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 
 }
 
 - (void)getText:(void (^ _Nullable)(_Nullable id, NSError * _Nullable error))completionHandler {
-    
+
     [self.editorView evaluateJavaScript:ZSSEditorText completionHandler:^(NSString *result, NSError *error) {
-        
+
         if (error != NULL) {
             NSLog(@"Text Parsing Error: %@", error);
         }
-        
-        
+
+
         completionHandler(result, error);
     }];
 }
@@ -1156,9 +1169,9 @@ static CGFloat kDefaultScale = 0.5;
 }
 
 - (BOOL)isFirstResponder {
-    
+
     [self.editorView evaluateJavaScript:ZSSEditorContent completionHandler:^(NSNumber *result, NSError *error) {
-        
+
         //save the result as a bool and then update the UI
         self.isFirstResponderUpdated = [result boolValue];
         if (self.isFirstResponderUpdated == true) {
@@ -1167,7 +1180,7 @@ static CGFloat kDefaultScale = 0.5;
             [self resignFirstResponder];
         }
     }];
-    
+
     //this state is old and will quickly be updated after the callback above completes
     //TODO: refactor to find a more elegant approach
     return self.isFirstResponderUpdated;
@@ -1175,11 +1188,11 @@ static CGFloat kDefaultScale = 0.5;
 
 - (void)showHTMLSource:(ZSSBarButtonItem *)barButtonItem {
     if (self.sourceView.hidden) {
-        
+
         [self getHTML:^(NSString *result, NSError * _Nullable error) {
             self.sourceView.text = result;
         }];
-        
+
         self.sourceView.hidden = NO;
         barButtonItem.tintColor = [UIColor blackColor];
         self.editorView.hidden = YES;
@@ -1196,257 +1209,257 @@ static CGFloat kDefaultScale = 0.5;
 - (void)removeFormat {
     NSString *trigger = @"zss_editor.removeFormating();";
     [self.editorView evaluateJavaScript:trigger completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 }
 
 - (void)alignLeft {
     NSString *trigger = @"zss_editor.setJustifyLeft();";
     [self.editorView evaluateJavaScript:trigger completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 }
 
 - (void)alignCenter {
     NSString *trigger = @"zss_editor.setJustifyCenter();";
     [self.editorView evaluateJavaScript:trigger completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 }
 
 - (void)alignRight {
     NSString *trigger = @"zss_editor.setJustifyRight();";
     [self.editorView evaluateJavaScript:trigger completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 }
 
 - (void)alignFull {
     NSString *trigger = @"zss_editor.setJustifyFull();";
     [self.editorView evaluateJavaScript:trigger completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 }
 
 - (void)setBold {
     NSString *trigger = @"zss_editor.setBold();";
     [self.editorView evaluateJavaScript:trigger completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 }
 
 - (void)setItalic {
     NSString *trigger = @"zss_editor.setItalic();";
     [self.editorView evaluateJavaScript:trigger completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 }
 
 - (void)setSubscript {
     NSString *trigger = @"zss_editor.setSubscript();";
     [self.editorView evaluateJavaScript:trigger completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 }
 
 - (void)setUnderline {
     NSString *trigger = @"zss_editor.setUnderline();";
     [self.editorView evaluateJavaScript:trigger completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 }
 
 - (void)setSuperscript {
     NSString *trigger = @"zss_editor.setSuperscript();";
     [self.editorView evaluateJavaScript:trigger completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 }
 
 - (void)setStrikethrough {
     NSString *trigger = @"zss_editor.setStrikeThrough();";
     [self.editorView evaluateJavaScript:trigger completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 }
 
 - (void)setUnorderedList {
     NSString *trigger = @"zss_editor.setUnorderedList();";
     [self.editorView evaluateJavaScript:trigger completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 }
 
 - (void)setOrderedList {
     NSString *trigger = @"zss_editor.setOrderedList();";
     [self.editorView evaluateJavaScript:trigger completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 }
 
 - (void)setHR {
     NSString *trigger = @"zss_editor.setHorizontalRule();";
     [self.editorView evaluateJavaScript:trigger completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 }
 
 - (void)setIndent {
     NSString *trigger = @"zss_editor.setIndent();";
     [self.editorView evaluateJavaScript:trigger completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 }
 
 - (void)setOutdent {
     NSString *trigger = @"zss_editor.setOutdent();";
     [self.editorView evaluateJavaScript:trigger completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 }
 
 - (void)heading1 {
     NSString *trigger = @"zss_editor.setHeading('h1');";
     [self.editorView evaluateJavaScript:trigger completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 }
 
 - (void)heading2 {
     NSString *trigger = @"zss_editor.setHeading('h2');";
     [self.editorView evaluateJavaScript:trigger completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 }
 
 - (void)heading3 {
     NSString *trigger = @"zss_editor.setHeading('h3');";
     [self.editorView evaluateJavaScript:trigger completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 }
 
 - (void)heading4 {
     NSString *trigger = @"zss_editor.setHeading('h4');";
     [self.editorView evaluateJavaScript:trigger completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 }
 
 - (void)heading5 {
     NSString *trigger = @"zss_editor.setHeading('h5');";
     [self.editorView evaluateJavaScript:trigger completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 }
 
 - (void)heading6 {
     NSString *trigger = @"zss_editor.setHeading('h6');";
     [self.editorView evaluateJavaScript:trigger completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 }
 
 - (void)paragraph {
     NSString *trigger = @"zss_editor.setParagraph();";
     [self.editorView evaluateJavaScript:trigger completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 }
 
 - (void)showFontsPicker {
-    
+
     // Save the selection location
     [self.editorView evaluateJavaScript:@"zss_editor.prepareInsert();" completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
-    
+
     //Call picker
     ZSSFontsViewController *fontPicker = [ZSSFontsViewController cancelableFontPickerViewControllerWithFontFamily:ZSSFontFamilyDefault];
     fontPicker.delegate = self;
     [self.navigationController pushViewController:fontPicker animated:YES];
-    
+
 }
 
 - (void)setSelectedFontFamily:(ZSSFontFamily)fontFamily {
-    
+
     NSString *fontFamilyString;
-    
+
     switch (fontFamily) {
         case ZSSFontFamilyDefault:
             fontFamilyString = @"Arial, Helvetica, sans-serif";
             break;
-            
+
         case ZSSFontFamilyGeorgia:
             fontFamilyString = @"Georgia, serif";
             break;
-            
+
         case ZSSFontFamilyPalatino:
             fontFamilyString = @"Palatino Linotype, Book Antiqua, Palatino, serif";
             break;
-            
+
         case ZSSFontFamilyTimesNew:
             fontFamilyString = @"Times New Roman, Times, serif";
             break;
-            
+
         case ZSSFontFamilyTrebuchet:
             fontFamilyString = @"Trebuchet MS, Helvetica, sans-serif";
             break;
-            
+
         case ZSSFontFamilyVerdana:
             fontFamilyString = @"Verdana, Geneva, sans-serif";
             break;
-            
+
         case ZSSFontFamilyCourierNew:
             fontFamilyString = @"Courier New, Courier, monospace";
             break;
-            
+
         default:
             fontFamilyString = @"Arial, Helvetica, sans-serif";
             break;
     }
-    
+
     NSString *trigger = [NSString stringWithFormat:@"zss_editor.setFontFamily(\"%@\");", fontFamilyString];
-    
+
     [self.editorView evaluateJavaScript:trigger completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 }
 
 - (void)textColor {
-    
+
     // Save the selection location
     [self.editorView evaluateJavaScript:@"zss_editor.prepareInsert();" completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
-    
+
     // Call the picker
     HRColorPickerViewController *colorPicker = [HRColorPickerViewController cancelableFullColorPickerViewControllerWithColor:[UIColor whiteColor]];
     colorPicker.delegate = self;
     colorPicker.tag = 1;
     colorPicker.title = NSLocalizedString(@"Text Color", nil);
     [self.navigationController pushViewController:colorPicker animated:YES];
-    
+
 }
 
 - (void)bgColor {
-    
+
     // Save the selection location
     [self.editorView evaluateJavaScript:@"zss_editor.prepareInsert();" completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
-    
+
     // Call the picker
     HRColorPickerViewController *colorPicker = [HRColorPickerViewController cancelableFullColorPickerViewControllerWithColor:[UIColor whiteColor]];
     colorPicker.delegate = self;
     colorPicker.tag = 2;
     colorPicker.title = NSLocalizedString(@"BG Color", nil);
     [self.navigationController pushViewController:colorPicker animated:YES];
-    
+
 }
 
 - (void)setSelectedColor:(UIColor*)color tag:(int)tag {
-    
+
     NSString *hex = [NSString stringWithFormat:@"#%06x",HexColorFromUIColor(color)];
     NSString *trigger;
     if (tag == 1) {
@@ -1455,48 +1468,48 @@ static CGFloat kDefaultScale = 0.5;
         trigger = [NSString stringWithFormat:@"zss_editor.setBackgroundColor(\"%@\");", hex];
     }
     [self.editorView evaluateJavaScript:trigger completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 }
 
 - (void)undo:(ZSSBarButtonItem *)barButtonItem {
     [self.editorView evaluateJavaScript:@"zss_editor.undo();" completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 }
 
 - (void)redo:(ZSSBarButtonItem *)barButtonItem {
     [self.editorView evaluateJavaScript:@"zss_editor.redo();" completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 }
 
 - (void)insertLink {
-    
+
     // Save the selection location
     [self.editorView evaluateJavaScript:@"zss_editor.prepareInsert();" completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 
     // Show the dialog for inserting or editing a link
     [self showInsertLinkDialogWithLink:self.selectedLinkURL title:self.selectedLinkTitle];
-    
+
 }
 
 
 - (void)showInsertLinkDialogWithLink:(NSString *)url title:(NSString *)title {
-    
+
     // Insert Button Title
     NSString *insertButtonTitle = !self.selectedLinkURL ? NSLocalizedString(@"Insert", nil) : NSLocalizedString(@"Update", nil);
-    
+
     // Picker Button
     UIButton *am = [UIButton buttonWithType:UIButtonTypeCustom];
     am.frame = CGRectMake(0, 0, 25, 25);
     [am setImage:[UIImage imageNamed:@"ZSSpicker.png" inBundle:[NSBundle bundleForClass:[ZSSRichTextEditor class]] compatibleWithTraitCollection:nil] forState:UIControlStateNormal];
     [am addTarget:self action:@selector(showInsertURLAlternatePicker) forControlEvents:UIControlEventTouchUpInside];
-    
+
     if ([NSProcessInfo instancesRespondToSelector:@selector(isOperatingSystemAtLeastVersion:)]) {
-        
+
         UIAlertController *alertController = [UIAlertController alertControllerWithTitle:NSLocalizedString(@"Insert Link", nil) message:nil preferredStyle:UIAlertControllerStyleAlert];
         [alertController addTextFieldWithConfigurationHandler:^(UITextField *textField) {
             textField.placeholder = NSLocalizedString(@"URL (required)", nil);
@@ -1519,7 +1532,7 @@ static CGFloat kDefaultScale = 0.5;
             [self focusTextEditor];
         }]];
         [alertController addAction:[UIAlertAction actionWithTitle:insertButtonTitle style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
-            
+
             UITextField *linkURL = [alertController.textFields objectAtIndex:0];
             UITextField *title = [alertController.textFields objectAtIndex:1];
             if (!self.selectedLinkURL) {
@@ -1531,9 +1544,9 @@ static CGFloat kDefaultScale = 0.5;
             [self focusTextEditor];
         }]];
         [self presentViewController:alertController animated:YES completion:NULL];
-        
+
     } else {
-        
+
         self.alertView = [[UIAlertView alloc] initWithTitle:NSLocalizedString(@"Insert Link", nil) message:nil delegate:self cancelButtonTitle:NSLocalizedString(@"Cancel", nil) otherButtonTitles:insertButtonTitle, nil];
         self.alertView.alertViewStyle = UIAlertViewStyleLoginAndPasswordInput;
         self.alertView.tag = 2;
@@ -1542,29 +1555,29 @@ static CGFloat kDefaultScale = 0.5;
         if (url) {
             linkURL.text = url;
         }
-        
+
         linkURL.rightView = am;
         linkURL.rightViewMode = UITextFieldViewModeAlways;
-        
+
         UITextField *alt = [self.alertView textFieldAtIndex:1];
         alt.secureTextEntry = NO;
         alt.placeholder = NSLocalizedString(@"Title", nil);
         if (title) {
             alt.text = title;
         }
-        
+
         [self.alertView show];
     }
-    
+
 }
 
 - (void)insertLink:(NSString *)url title:(NSString *)title {
-    
+
     NSString *trigger = [NSString stringWithFormat:@"zss_editor.insertLink(\"%@\", \"%@\");", url, title];
     [self.editorView evaluateJavaScript:trigger completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
-    
+
     if (_receiveEditorDidChangeEvents) {
         [self updateEditor];
     }
@@ -1574,9 +1587,9 @@ static CGFloat kDefaultScale = 0.5;
 - (void)updateLink:(NSString *)url title:(NSString *)title {
     NSString *trigger = [NSString stringWithFormat:@"zss_editor.updateLink(\"%@\", \"%@\");", url, title];
     [self.editorView evaluateJavaScript:trigger completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
-    
+
     if (_receiveEditorDidChangeEvents) {
         [self updateEditor];
     }
@@ -1588,40 +1601,40 @@ static CGFloat kDefaultScale = 0.5;
 }
 
 - (void)addCustomToolbarItemWithButton:(UIButton *)button {
-    
+
     if(self.customBarButtonItems == nil)
     {
         self.customBarButtonItems = [NSMutableArray array];
     }
-    
+
     button.titleLabel.font = [UIFont fontWithName:@"HelveticaNeue-UltraLight" size:28.5f];
     [button setTitleColor:[self barButtonItemDefaultColor] forState:UIControlStateNormal];
     [button setTitleColor:[self barButtonItemSelectedDefaultColor] forState:UIControlStateHighlighted];
-    
+
     ZSSBarButtonItem *barButtonItem = [[ZSSBarButtonItem alloc] initWithCustomView:button];
-    
+
     [self.customBarButtonItems addObject:barButtonItem];
-    
+
     [self buildToolbar];
 }
 
 - (void)addCustomToolbarItem:(ZSSBarButtonItem *)item {
-    
+
     if(self.customZSSBarButtonItems == nil)
     {
         self.customZSSBarButtonItems = [NSMutableArray array];
     }
     [self.customZSSBarButtonItems addObject:item];
-    
+
     [self buildToolbar];
 }
 
 
 - (void)removeLink {
     [self.editorView evaluateJavaScript:@"zss_editor.unlink();" completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
-    
+
     if (_receiveEditorDidChangeEvents) {
         [self updateEditor];
     }
@@ -1629,49 +1642,49 @@ static CGFloat kDefaultScale = 0.5;
 
 - (void)quickLink {
     [self.editorView evaluateJavaScript:@"zss_editor.quickLink();" completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
-    
+
     if (_receiveEditorDidChangeEvents) {
         [self updateEditor];
     }
 }
 
 - (void)insertImage {
-    
+
     // Save the selection location
     [self.editorView evaluateJavaScript:@"zss_editor.prepareInsert();" completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 
     [self showInsertImageDialogWithLink:self.selectedImageURL alt:self.selectedImageAlt];
-    
+
 }
 
 - (void)insertImageFromDevice {
-    
+
     // Save the selection location
     [self.editorView evaluateJavaScript:@"zss_editor.prepareInsert();" completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 
     [self showInsertImageDialogFromDeviceWithScale:self.selectedImageScale alt:self.selectedImageAlt];
-    
+
 }
 
 - (void)showInsertImageDialogWithLink:(NSString *)url alt:(NSString *)alt {
-    
+
     // Insert Button Title
     NSString *insertButtonTitle = !self.selectedImageURL ? NSLocalizedString(@"Insert", nil) : NSLocalizedString(@"Update", nil);
-    
+
     // Picker Button
     UIButton *am = [UIButton buttonWithType:UIButtonTypeCustom];
     am.frame = CGRectMake(0, 0, 25, 25);
     [am setImage:[UIImage imageNamed:@"ZSSpicker.png" inBundle:[NSBundle bundleForClass:[ZSSRichTextEditor class]] compatibleWithTraitCollection:nil] forState:UIControlStateNormal];
     [am addTarget:self action:@selector(showInsertImageAlternatePicker) forControlEvents:UIControlEventTouchUpInside];
-    
+
     if ([NSProcessInfo instancesRespondToSelector:@selector(isOperatingSystemAtLeastVersion:)]) {
-        
+
         UIAlertController *alertController = [UIAlertController alertControllerWithTitle:NSLocalizedString(@"Insert Image", nil) message:nil preferredStyle:UIAlertControllerStyleAlert];
         [alertController addTextFieldWithConfigurationHandler:^(UITextField *textField) {
             textField.placeholder = NSLocalizedString(@"URL (required)", nil);
@@ -1694,7 +1707,7 @@ static CGFloat kDefaultScale = 0.5;
             [self focusTextEditor];
         }]];
         [alertController addAction:[UIAlertAction actionWithTitle:insertButtonTitle style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
-            
+
             UITextField *imageURL = [alertController.textFields objectAtIndex:0];
             UITextField *alt = [alertController.textFields objectAtIndex:1];
             if (!self.selectedImageURL) {
@@ -1705,9 +1718,9 @@ static CGFloat kDefaultScale = 0.5;
             [self focusTextEditor];
         }]];
         [self presentViewController:alertController animated:YES completion:NULL];
-        
+
     } else {
-        
+
         self.alertView = [[UIAlertView alloc] initWithTitle:NSLocalizedString(@"Insert Image", nil) message:nil delegate:self cancelButtonTitle:NSLocalizedString(@"Cancel", nil) otherButtonTitles:insertButtonTitle, nil];
         self.alertView.alertViewStyle = UIAlertViewStyleLoginAndPasswordInput;
         self.alertView.tag = 1;
@@ -1716,11 +1729,11 @@ static CGFloat kDefaultScale = 0.5;
         if (url) {
             imageURL.text = url;
         }
-        
+
         imageURL.rightView = am;
         imageURL.rightViewMode = UITextFieldViewModeAlways;
         imageURL.clearButtonMode = UITextFieldViewModeAlways;
-        
+
         UITextField *alt1 = [self.alertView textFieldAtIndex:1];
         alt1.secureTextEntry = NO;
         alt1.placeholder = NSLocalizedString(@"Alt", nil);
@@ -1728,22 +1741,22 @@ static CGFloat kDefaultScale = 0.5;
         if (alt) {
             alt1.text = alt;
         }
-        
+
         [self.alertView show];
     }
-    
+
 }
 
 - (void)showInsertImageDialogFromDeviceWithScale:(CGFloat)scale alt:(NSString *)alt {
-    
+
     // Insert button title
     NSString *insertButtonTitle = !self.selectedImageURL ? NSLocalizedString(@"Pick Image", nil) : NSLocalizedString(@"Pick New Image", nil);
-    
+
     //If the OS version supports the new UIAlertController go for it. Otherwise use the old UIAlertView
     if ([NSProcessInfo instancesRespondToSelector:@selector(isOperatingSystemAtLeastVersion:)]) {
-        
+
         UIAlertController *alertController = [UIAlertController alertControllerWithTitle:NSLocalizedString(@"Insert Image From Device", nil) message:nil preferredStyle:UIAlertControllerStyleAlert];
-        
+
         //Add alt text field
         [alertController addTextFieldWithConfigurationHandler:^(UITextField *textField) {
             textField.placeholder = NSLocalizedString(@"Alt", nil);
@@ -1753,7 +1766,7 @@ static CGFloat kDefaultScale = 0.5;
                 textField.text = alt;
             }
         }];
-        
+
         //Add scale text field
         [alertController addTextFieldWithConfigurationHandler:^(UITextField *textField) {
             textField.clearButtonMode = UITextFieldViewModeAlways;
@@ -1761,32 +1774,32 @@ static CGFloat kDefaultScale = 0.5;
             textField.placeholder = NSLocalizedString(@"Image scale, 0.5 by default", nil);
             textField.keyboardType = UIKeyboardTypeDecimalPad;
         }];
-        
+
         //Cancel action
         [alertController addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"Cancel", nil) style:UIAlertActionStyleCancel handler:^(UIAlertAction *action) {
             [self focusTextEditor];
         }]];
-        
+
         //Insert action
         [alertController addAction:[UIAlertAction actionWithTitle:insertButtonTitle style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
             UITextField *textFieldAlt = [alertController.textFields objectAtIndex:0];
             UITextField *textFieldScale = [alertController.textFields objectAtIndex:1];
-            
+
             self.selectedImageScale = [textFieldScale.text floatValue]?:kDefaultScale;
             self.selectedImageAlt = textFieldAlt.text?:@"";
-            
+
             [self presentViewController:self.imagePicker animated:YES completion:nil];
-            
+
         }]];
-        
+
         [self presentViewController:alertController animated:YES completion:NULL];
-        
+
     } else {
-        
+
         self.alertView = [[UIAlertView alloc] initWithTitle:NSLocalizedString(@"Insert Image", nil) message:nil delegate:self cancelButtonTitle:NSLocalizedString(@"Cancel", nil) otherButtonTitles:insertButtonTitle, nil];
         self.alertView.alertViewStyle = UIAlertViewStyleLoginAndPasswordInput;
         self.alertView.tag = 3;
-        
+
         UITextField *textFieldAlt = [self.alertView textFieldAtIndex:0];
         textFieldAlt.secureTextEntry = NO;
         textFieldAlt.placeholder = NSLocalizedString(@"Alt", nil);
@@ -1794,20 +1807,20 @@ static CGFloat kDefaultScale = 0.5;
         if (alt) {
             textFieldAlt.text = alt;
         }
-        
+
         UITextField *textFieldScale = [self.alertView textFieldAtIndex:1];
         textFieldScale.placeholder = NSLocalizedString(@"Image scale, 0.5 by default", nil);
         textFieldScale.keyboardType = UIKeyboardTypeDecimalPad;
-        
+
         [self.alertView show];
     }
-    
+
 }
 
 - (void)insertImage:(NSString *)url alt:(NSString *)alt {
     NSString *trigger = [NSString stringWithFormat:@"zss_editor.insertImage(\"%@\", \"%@\");", url, alt];
     [self.editorView evaluateJavaScript:trigger completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 }
 
@@ -1815,30 +1828,30 @@ static CGFloat kDefaultScale = 0.5;
 - (void)updateImage:(NSString *)url alt:(NSString *)alt {
     NSString *trigger = [NSString stringWithFormat:@"zss_editor.updateImage(\"%@\", \"%@\");", url, alt];
     [self.editorView evaluateJavaScript:trigger completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 }
 
 - (void)insertImageBase64String:(NSString *)imageBase64String alt:(NSString *)alt {
     NSString *trigger = [NSString stringWithFormat:@"zss_editor.insertImageBase64String(\"%@\", \"%@\");", imageBase64String, alt];
     [self.editorView evaluateJavaScript:trigger completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 }
 
 - (void)updateImageBase64String:(NSString *)imageBase64String alt:(NSString *)alt {
     NSString *trigger = [NSString stringWithFormat:@"zss_editor.updateImageBase64String(\"%@\", \"%@\");", imageBase64String, alt];
     [self.editorView evaluateJavaScript:trigger completionHandler:^(NSString *result, NSError *error) {
-     
+
     }];
 }
 
 
 - (void)updateToolBarWithButtonName:(NSString *)name {
-    
+
     // Items that are enabled
     NSArray *itemNames = [name componentsSeparatedByString:@","];
-    
+
     // Special case for link
     NSMutableArray *itemsModified = [[NSMutableArray alloc] init];
     for (NSString *linkItem in itemNames) {
@@ -1862,9 +1875,9 @@ static CGFloat kDefaultScale = 0.5;
         [itemsModified addObject:updatedItem];
     }
     itemNames = [NSArray arrayWithArray:itemsModified];
-    
+
     self.editorItemsEnabled = itemNames;
-    
+
     // Highlight items
     NSArray *items = self.toolbar.items;
     for (ZSSBarButtonItem *item in items) {
@@ -1874,7 +1887,7 @@ static CGFloat kDefaultScale = 0.5;
             item.tintColor = [self barButtonItemDefaultColor];
         }
     }
-    
+
 }
 
 
@@ -1893,7 +1906,7 @@ static CGFloat kDefaultScale = 0.5;
             [textView setContentOffset:offset];
         }];
     }
-    
+
 }
 
 
@@ -1902,27 +1915,27 @@ static CGFloat kDefaultScale = 0.5;
 - (void)userContentController:(WKUserContentController *)userContentController didReceiveScriptMessage:(WKScriptMessage *)message {
     NSString *messageString = (NSString *)message.body;
     NSLog(@"Message received: %@", messageString);
-    
+
     /*
-     
+
      Callback for when text is changed, written by @madebydouglas derived from richardortiz84 https://github.com/nnhubbard/ZSSRichTextEditor/issues/5
-     
+
      */
-    
+
     if ([messageString isEqualToString:@"paste"]) {
         self.editorPaste = YES;
     }
-    
+
     if ([messageString isEqualToString:@"input"]) {
-        
+
         if (_receiveEditorDidChangeEvents) {
             [self updateEditor];
         }
-        
+
         [self getText:^(NSString * result, NSError * _Nullable error) {
             [self checkForMentionOrHashtagInText:result];
         }];
-        
+
         if (self.editorPaste) {
             [self blurTextEditor];
             self.editorPaste = NO;
@@ -1933,10 +1946,10 @@ static CGFloat kDefaultScale = 0.5;
 #pragma mark - WKNavigationDelegate Delegate
 
 - (void)webView:(WKWebView *)webView decidePolicyForNavigationAction:(WKNavigationAction *)navigationAction decisionHandler:(void (^)(WKNavigationActionPolicy))decisionHandler {
-       
-    
+
+
     NSString *query = [navigationAction.request.URL query];
-    
+
     NSString *urlString = [navigationAction.request.URL absoluteString];
 
     decisionHandler(WKNavigationActionPolicyAllow);
@@ -1945,73 +1958,73 @@ static CGFloat kDefaultScale = 0.5;
     NSLog(@"%@", urlString);
     NSLog(@"%@", query);
 
-    
+
     if (navigationAction.navigationType == WKNavigationTypeLinkActivated) {
 
         //On the old UIWebView delegate it returned false Bool here
         //TODO: what should we do now?
-        
+
     } else if ([urlString rangeOfString:@"callback://0/"].location != NSNotFound) {
-        
+
         // We recieved the callback
         NSString *className = [urlString stringByReplacingOccurrencesOfString:@"callback://0/" withString:@""];
         [self updateToolBarWithButtonName:className];
-        
+
     } else if ([urlString rangeOfString:@"debug://"].location != NSNotFound) {
-        
+
         NSLog(@"Debug Found");
-        
+
         // We recieved the callback
         NSString *debug = [urlString stringByReplacingOccurrencesOfString:@"debug://" withString:@""];
         debug = [debug stringByReplacingPercentEscapesUsingEncoding:NSStringEncodingConversionAllowLossy];
         NSLog(@"%@", debug);
-        
+
     } else if ([urlString rangeOfString:@"scroll://"].location != NSNotFound) {
-        
+
         NSInteger position = [[urlString stringByReplacingOccurrencesOfString:@"scroll://" withString:@""] integerValue];
         [self editorDidScrollWithPosition:position];
-        
+
     }
-        
+
 }
 
 - (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation {
     self.editorLoaded = YES;
-    
+
     if (!self.internalHTML) {
         self.internalHTML = @"";
     }
     [self updateHTML];
-    
+
     if(self.placeholder) {
         [self setPlaceholderText];
     }
-    
+
     if (self.customCSS) {
         [self updateCSS];
     }
-    
+
     if (self.shouldShowKeyboard) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
             [self focusTextEditor];
         });
     }
-    
+
     /*
-     
+
      Create listeners for when text is changed, solution by @madebydouglas derived from richardortiz84 https://github.com/nnhubbard/ZSSRichTextEditor/issues/5
-     
+
      */
-    
+
     NSString *inputListener = @"document.getElementById('zss_editor_content').addEventListener('input', function() {window.webkit.messageHandlers.jsm.postMessage('input');});";
     NSString *pasteListener = @"document.getElementById('zss_editor_content').addEventListener('paste', function() {window.webkit.messageHandlers.jsm.postMessage('paste');});";
-    
+
     [self.editorView evaluateJavaScript:inputListener completionHandler:^(NSString *result, NSError *error) {
         if (error != NULL) {
             NSLog(@"%@", error);
         }
     }];
-    
+
     [self.editorView evaluateJavaScript:pasteListener completionHandler:^(NSString *result, NSError *error) {
         if (error != NULL) {
             NSLog(@"%@", error);
@@ -2022,65 +2035,65 @@ static CGFloat kDefaultScale = 0.5;
 #pragma mark - Mention & Hashtag Support Section
 
 - (void)checkForMentionOrHashtagInText:(NSString *)text {
-    
+
     if ([text containsString:@" "] && [text length] > 0) {
-        
+
         NSString *lastWord = nil;
         NSString *matchedWord = nil;
         BOOL ContainsHashtag = NO;
         BOOL ContainsMention = NO;
-        
+
         NSRange range = [text rangeOfString:@" " options:NSBackwardsSearch];
         lastWord = [text substringFromIndex:range.location];
-        
+
         if (lastWord != nil) {
-            
+
             //Check if last word typed starts with a #
             NSRegularExpression *hashtagRegex = [NSRegularExpression regularExpressionWithPattern:@"#(\\w+)" options:0 error:nil];
             NSArray *hashtagMatches = [hashtagRegex matchesInString:lastWord options:0 range:NSMakeRange(0, lastWord.length)];
-            
+
             for (NSTextCheckingResult *match in hashtagMatches) {
-                
+
                 NSRange wordRange = [match rangeAtIndex:1];
                 NSString *word = [lastWord substringWithRange:wordRange];
                 matchedWord = word;
                 ContainsHashtag = YES;
-                
+
             }
-            
+
             if (!ContainsHashtag) {
-                
+
                 //Check if last word typed starts with a @
                 NSRegularExpression *mentionRegex = [NSRegularExpression regularExpressionWithPattern:@"@(\\w+)" options:0 error:nil];
                 NSArray *mentionMatches = [mentionRegex matchesInString:lastWord options:0 range:NSMakeRange(0, lastWord.length)];
-                
+
                 for (NSTextCheckingResult *match in mentionMatches) {
-                    
+
                     NSRange wordRange = [match rangeAtIndex:1];
                     NSString *word = [lastWord substringWithRange:wordRange];
                     matchedWord = word;
                     ContainsMention = YES;
-                    
+
                 }
-                
+
             }
-            
+
         }
-        
+
         if (ContainsHashtag) {
-            
+
             [self hashtagRecognizedWithWord:matchedWord];
-            
+
         }
-        
+
         if (ContainsMention) {
-            
+
             [self mentionRecognizedWithWord:matchedWord];
-            
+
         }
-        
+
     }
-    
+
 }
 
 #pragma mark - Callbacks
@@ -2101,7 +2114,7 @@ static CGFloat kDefaultScale = 0.5;
 #pragma mark - AlertView
 
 - (BOOL)alertViewShouldEnableFirstOtherButton:(UIAlertView *)alertView {
-    
+
     if (alertView.tag == 1) {
         UITextField *textField = [alertView textFieldAtIndex:0];
         UITextField *textField2 = [alertView textFieldAtIndex:1];
@@ -2114,12 +2127,12 @@ static CGFloat kDefaultScale = 0.5;
             return NO;
         }
     }
-    
+
     return YES;
 }
 
 - (void)alertView:(UIAlertView *)alertView clickedButtonAtIndex:(NSInteger)buttonIndex {
-    
+
     if (alertView.tag == 1) {
         if (buttonIndex == 1) {
             UITextField *imageURL = [alertView textFieldAtIndex:0];
@@ -2144,12 +2157,12 @@ static CGFloat kDefaultScale = 0.5;
         if (buttonIndex == 1) {
             UITextField *textFieldAlt = [alertView textFieldAtIndex:0];
             UITextField *textFieldScale = [alertView textFieldAtIndex:1];
-            
+
             self.selectedImageScale = [textFieldScale.text floatValue]?:kDefaultScale;
             self.selectedImageAlt = textFieldAlt.text?:@"";
-            
+
             [self presentViewController:self.imagePicker animated:YES completion:nil];
-            
+
         }
     }
 }
@@ -2174,31 +2187,31 @@ static CGFloat kDefaultScale = 0.5;
 }
 
 - (void)imagePickerController:(UIImagePickerController *)picker didFinishPickingMediaWithInfo:(NSDictionary<NSString *, id> *)info{
-    
+
     UIImage *selectedImage = info[UIImagePickerControllerEditedImage]?:info[UIImagePickerControllerOriginalImage];
-    
+
     //Scale the image
     CGSize targetSize = CGSizeMake(selectedImage.size.width * self.selectedImageScale, selectedImage.size.height * self.selectedImageScale);
     UIGraphicsBeginImageContext(targetSize);
     [selectedImage drawInRect:CGRectMake(0,0,targetSize.width,targetSize.height)];
     UIImage* scaledImage = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
-    
+
     //Compress the image, as it is going to be encoded rather than linked
     NSData *scaledImageData = UIImageJPEGRepresentation(scaledImage, kJPEGCompression);
-    
+
     //Encode the image data as a base64 string
     NSString *imageBase64String = [scaledImageData base64EncodedStringWithOptions:0];
-    
+
     //Decide if we have to insert or update
     if (!self.imageBase64String) {
         [self insertImageBase64String:imageBase64String alt:self.selectedImageAlt];
     } else {
         [self updateImageBase64String:imageBase64String alt:self.selectedImageAlt];
     }
-    
+
     self.imageBase64String = imageBase64String;
-    
+
     //Dismiss the Image Picker
     [picker.presentingViewController dismissViewControllerAnimated:YES completion:nil];
 }
@@ -2212,28 +2225,28 @@ static CGFloat kDefaultScale = 0.5;
     CGFloat duration = [[info objectForKey:UIKeyboardAnimationDurationUserInfoKey] floatValue];
     int curve = [[info objectForKey:UIKeyboardAnimationCurveUserInfoKey] intValue];
     CGRect keyboardEnd = [[info objectForKey:UIKeyboardFrameEndUserInfoKey] CGRectValue];
-    
+
     // Toolbar Sizes
     CGFloat sizeOfToolbar = self.toolbarHolder.frame.size.height;
-    
+
     // Keyboard Size
     CGFloat keyboardHeight = keyboardEnd.size.height;
-    
+
     // Correct Curve
     UIViewAnimationOptions animationOptions = curve << 16;
-    
+
     const int extraHeight = 10;
-    
+
     if (keyboardEnd.origin.y < [[UIScreen mainScreen] bounds].size.height) {
-        
+
         [UIView animateWithDuration:duration delay:0 options:animationOptions animations:^{
-            
+
             // Toolbar
             CGRect toolbarFrame = self.toolbarHolder.frame;
             CGRect kbRect = [self.toolbarHolder.superview convertRect:keyboardEnd fromView:nil];
             toolbarFrame.origin.y = kbRect.origin.y - sizeOfToolbar;
             self.toolbarHolder.frame = toolbarFrame;
-            
+
             // Editor View
             CGRect editorFrame = self.editorView.frame;
             editorFrame.size.height = toolbarFrame.origin.y - extraHeight;
@@ -2241,24 +2254,24 @@ static CGFloat kDefaultScale = 0.5;
             self.editorViewFrame = self.editorView.frame;
             self.editorView.scrollView.contentInset = UIEdgeInsetsZero;
             self.editorView.scrollView.scrollIndicatorInsets = UIEdgeInsetsZero;
-            
+
             // Source View
             CGRect sourceFrame = self.sourceView.frame;
             sourceFrame.size.height = (self.view.frame.size.height - keyboardHeight) - sizeOfToolbar - extraHeight;
             self.sourceView.frame = sourceFrame;
-            
+
             // Provide editor with keyboard height and editor view height
             [self setFooterHeight:(keyboardHeight - 8)];
             [self setContentHeight: self.editorViewFrame.size.height];
-            
+
         } completion:nil];
-        
+
     } else {
-        
+
         [UIView animateWithDuration:duration delay:0 options:animationOptions animations:^{
-            
+
             CGRect frame = self.toolbarHolder.frame;
-            
+
             if (self->_alwaysShowToolbar) {
                 CGFloat bottomSafeAreaInset = 0.0;
                 if (@available(iOS 11.0, *)) {
@@ -2268,41 +2281,41 @@ static CGFloat kDefaultScale = 0.5;
             } else {
                 frame.origin.y = self.view.frame.size.height + keyboardHeight;
             }
-            
+
             self.toolbarHolder.frame = frame;
-            
+
             // Editor View
             CGRect editorFrame = self.editorView.frame;
-            
+
             if (self->_alwaysShowToolbar) {
                 editorFrame.size.height = ((self.view.frame.size.height - sizeOfToolbar) - extraHeight);
             } else {
                 editorFrame.size.height = self.view.frame.size.height;
             }
-            
+
             self.editorView.frame = editorFrame;
             self.editorViewFrame = self.editorView.frame;
             self.editorView.scrollView.contentInset = UIEdgeInsetsZero;
             self.editorView.scrollView.scrollIndicatorInsets = UIEdgeInsetsZero;
-            
+
             // Source View
             CGRect sourceFrame = self.sourceView.frame;
-            
+
             if (self->_alwaysShowToolbar) {
                 sourceFrame.size.height = ((self.view.frame.size.height - sizeOfToolbar) - extraHeight);
             } else {
                 sourceFrame.size.height = self.view.frame.size.height;
             }
-            
+
             self.sourceView.frame = sourceFrame;
-            
+
             [self setFooterHeight:0];
             [self setContentHeight:self.editorViewFrame.size.height];
-            
+
         } completion:nil];
-        
+
     }
-    
+
 }
 
 
@@ -2322,19 +2335,19 @@ static CGFloat kDefaultScale = 0.5;
     html = [html stringByReplacingOccurrencesOfString:@"<br>" withString:@"<br />"];
     html = [html stringByReplacingOccurrencesOfString:@"<hr>" withString:@"<hr />"];
     if (self.formatHTML) {
-                
+
         html = [NSString stringWithFormat:@"style_html(\"%@\");", html];
         [self.editorView evaluateJavaScript:html completionHandler:^(NSString *result, NSError *error) {
-            
+
             if (error != NULL) {
                 NSLog(@"HTML Tidying Error: %@", error);
             }
-            
+
             NSLog(@"%@", result);
-            
+
             completionHandler(result, error);
         }];
-        
+
     } else {
         completionHandler(html, NULL);
     }
@@ -2342,21 +2355,21 @@ static CGFloat kDefaultScale = 0.5;
 
 
 - (UIColor *)barButtonItemDefaultColor {
-    
+
     if (self.toolbarItemTintColor) {
         return self.toolbarItemTintColor;
     }
-    
+
     return [UIColor colorWithRed:0.0f/255.0f green:122.0f/255.0f blue:255.0f/255.0f alpha:1.0f];
 }
 
 
 - (UIColor *)barButtonItemSelectedDefaultColor {
-    
+
     if (self.toolbarItemSelectedTintColor) {
         return self.toolbarItemSelectedTintColor;
     }
-    
+
     return [UIColor blackColor];
 }
 
